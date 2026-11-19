@@ -46,15 +46,20 @@ class Reporter:
         self._total = 0
         self._completed = 0
         self._failed = 0
+        self._skipped = 0
 
     def _paint(self, text, code):
         return f"\033[{code}m{text}\033[0m" if self.color else text
 
-    def start(self, tasks):
+    def start(self, tasks, *, skipped=()):
         self._total = len(tasks)
-        if not tasks:
+        self._skipped = len(skipped)
+        if self.verbose:
+            for document in skipped:
+                print(f"SKIPPED  {document.tex_file}: {document.reason}", file=self.stream)
+        if not tasks and not skipped:
             print("No LaTeX main documents found.", file=self.stream)
-        elif self.stream.isatty() and not self.verbose:
+        elif tasks and self.stream.isatty() and not self.verbose:
             self._bar = _TaskProgressBar(
                 total=len(tasks),
                 desc=self.task_type.value.capitalize(),
@@ -108,7 +113,8 @@ class Reporter:
         self.close()
         print(
             f"Processed {summary.total} document(s) in {summary.elapsed_time:.2f}s: "
-            f"{summary.succeeded} succeeded, {summary.failed} failed, {summary.cancelled} cancelled",
+            f"{summary.succeeded} succeeded, {summary.failed} failed, {summary.cancelled} cancelled"
+            f", {self._skipped} skipped",
             file=self.stream,
         )
         for result in sorted(summary.results, key=lambda item: item.task.index):

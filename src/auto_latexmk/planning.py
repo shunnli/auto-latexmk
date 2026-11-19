@@ -4,32 +4,21 @@ import os
 from pathspec import GitIgnoreSpec
 
 from auto_latexmk.cache import CompilerPrefCache, canonical_tex_path
+from auto_latexmk.git_selection import GitSelection
 from auto_latexmk.models import (
     CommandSpec,
     LatexTask,
+    SkippedDocument,
     StepType,
     TaskPlan,
     TaskType,
 )
 from auto_latexmk.runtime import AutoLatexmkError, logger
+from auto_latexmk.tex_dependencies import strip_latex_comment
 
 
 def _matches_patterns(name: str, patterns: list[str]) -> bool:
     return any(fnmatch.fnmatch(name, pattern.rstrip("/\\")) for pattern in patterns)
-
-
-def strip_latex_comment(line: str) -> str:
-    for index, character in enumerate(line):
-        if character != "%":
-            continue
-        backslashes = 0
-        cursor = index - 1
-        while cursor >= 0 and line[cursor] == "\\":
-            backslashes += 1
-            cursor -= 1
-        if backslashes % 2 == 0:
-            return line[:index]
-    return line
 
 
 def is_main_tex_file(path: str) -> bool:
@@ -203,8 +192,10 @@ def create_task_plan(
     exclude_patterns: list[str],
     use_gitignore: bool,
     pref_cache: CompilerPrefCache | None,
+    force: bool = False,
 ) -> TaskPlan:
     input_path = canonical_tex_path(path)
+    skipped = []
     if os.path.isfile(input_path):
         if not input_path.endswith(".tex"):
             raise AutoLatexmkError(f"{input_path} is not a .tex file.")
@@ -219,6 +210,16 @@ def create_task_plan(
             exclude_patterns=exclude_patterns,
             use_gitignore=use_gitignore,
         )
+        if task_type is TaskType.COMPILE and not force and requested_engine == "auto":
+            selection = GitSelection()
+            selected = []
+            for tex_file in tex_files:
+                reason = selection.skip_reason(tex_file)
+                if reason is None:
+                    selected.append(tex_file)
+                else:
+                    skipped.append(SkippedDocument(tex_file, reason))
+            tex_files = selected
     else:
         raise AutoLatexmkError(f"{input_path} does not exist.")
 
@@ -232,4 +233,4 @@ def create_task_plan(
         )
         for index, tex_file in enumerate(tex_files, start=1)
     )
-    return TaskPlan(root_dir=root_dir, task_type=task_type, tasks=tasks)
+    return TaskPlan(root_dir=root_dir, task_type=task_type, tasks=tasks, skipped=tuple(skipped))

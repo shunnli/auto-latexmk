@@ -52,6 +52,11 @@ def parse_args(argv=None, *, task_type=TaskType.COMPILE):
         help="Directory to scan recursively, or one main .tex file (default: current directory).",
     )
     if task_type is not TaskType.CLEAN:
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Bypass Git-based skipping during directory scanning (rebuild already bypasses it).",
+        )
         engines = parser.add_mutually_exclusive_group()
         engines.add_argument(
             "--engine",
@@ -84,7 +89,7 @@ def parse_args(argv=None, *, task_type=TaskType.COMPILE):
             help="Do not read or update successful-engine preferences.",
         )
     else:
-        parser.set_defaults(engine=None, jobs=1, no_engine_cache=True)
+        parser.set_defaults(engine=None, jobs=1, no_engine_cache=True, force=False)
     parser.add_argument(
         "-x",
         "--exclude",
@@ -135,9 +140,10 @@ def _run(task_type, argv=None):
             exclude_patterns=args.exclude,
             use_gitignore=args.use_gitignore,
             pref_cache=pref_cache,
+            force=args.force,
         )
         run_start = time.monotonic()
-        reporter.start(plan.tasks)
+        reporter.start(plan.tasks, skipped=plan.skipped)
         interrupted = False
         try:
             results = run_tasks(plan.tasks, jobs=args.jobs, reporter=reporter)

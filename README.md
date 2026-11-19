@@ -41,15 +41,32 @@ auto-latexmk-rebuild main.tex           # Clean and compile again
 | `-pdfxe` / `-pdf` / `-pdflua` | Select XeLaTeX / pdfLaTeX / LuaLaTeX |
 | `-j N`, `--jobs N` | Parallel documents; default: `min(4, CPU count)` |
 | `--no-engine-cache` | Disable reading and updating engine preferences |
+| `--force` | Bypass Git-based skipping during directory scanning |
 
 Choose one engine option. Cleanup runs sequentially.
 
 ## ⚙️ Defaults
 
 - **Discovery:** find main files containing an uncommented `\documentclass`, respect nested `.gitignore`, and skip hidden directories. Explicit file paths bypass scan filters.
+- **Git-aware compilation:** for PDFs already tracked by Git, directory scans check the PDF, sources, and dependencies (including images). Skip only when everything is clean and the PDF's last-change commit covers the dependency changes, avoiding unnecessary PDF diffs. Otherwise, or if uncertain, run latexmk normally. `--force` bypasses these checks.
 - **Files:** put auxiliary files in `.aux/` and PDFs beside the source. Cleanup uses `latexmk -c`; rebuilding skips compilation if cleanup fails.
 - **Engine:** explicit option → first-line `% !TEX` directive → last successful engine → XeLaTeX. Preferences are stored in `~/.cache/auto-latexmk/compiler-preferences.json`.
 - **Execution:** show progress and a final summary. A failed document does not stop others. There is no time limit; **Ctrl+C** stops active processes and preserves captured output.
+
+Explicit `.tex` paths, explicit engine options, and `auto-latexmk-rebuild` also bypass Git skipping.
+
+## 📊 Output and timing
+
+Normal mode shows a progress bar and summary:
+
+```text
+Compile  ████████████████  2/2  00:04
+Processed 2 document(s) in 4.15s: 2 succeeded, 0 failed, 0 cancelled, 7 skipped
+```
+
+Times show elapsed execution time, excluding directory scanning and Git checks. Skipped documents are excluded from the task count; `--verbose` lists their paths and reasons.
+
+With `--verbose` or redirected output, each completed document gets a line with its own duration (excluding queue time). Parallel durations overlap, so they do not add up to the summary time.
 
 ## 🔎 Troubleshooting
 

@@ -33,10 +33,17 @@ class LatexTask:
 
 
 @dataclass(frozen=True)
+class SkippedDocument:
+    tex_file: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class TaskPlan:
     root_dir: str
     task_type: TaskType
     tasks: tuple[LatexTask, ...]
+    skipped: tuple[SkippedDocument, ...] = ()
 
 
 @dataclass
